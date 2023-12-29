@@ -99,7 +99,55 @@ can_connect_https(const char *hostname)
 }
 
 // HTTPSを使用してHTMLコンテンツを取得する関数
-void fetch_html_https(const char *hostname, int download) {
+void print_ssl_errors() {
+    unsigned long err;
+    while ((err = ERR_get_error()) != 0) {
+        char *str = ERR_error_string(err, 0);
+        if (str) {
+            fprintf(stderr, "SSL error: %s\n", str);
+        } else {
+            fprintf(stderr, "SSL error: %lu (no string representation)\n", err);
+        }
+    }
+}
+
+int verify_certificate() {
+    char response[2];
+    printf("SSL/TLS handshake failed. Ignore certificate verification? (y/N): ");
+    if (scanf("%1s", response) == 1) {
+        return (response[0] == 'y' || response[0] == 'Y');
+    }
+    return 0;
+}
+
+void parse_url(const char *url, char *hostname, char *path) {
+    char *url_copy = strdup(url);
+    char *scheme_end = strstr(url_copy, "://");
+
+    if (scheme_end) {
+        *scheme_end = '\0';  // スキームの終わりをマーク
+        scheme_end += 3;     // "://" をスキップ
+    } else {
+        scheme_end = url_copy;  // スキームがない場合
+    }
+
+    char *path_start = strstr(scheme_end, "/");
+    if (path_start) {
+        *path_start = '\0';  // ホスト名の終わりをマーク
+        strcpy(hostname, scheme_end);
+        strcpy(path, path_start + 1);
+    } else {
+        strcpy(hostname, scheme_end);
+        strcpy(path, "");  // パスがない場合
+    }
+    free(url_copy);
+}
+
+void fetch_html_https(const char *url, int download) {
+    char hostname[256] = {0};
+    char path[256] = {0};
+    parse_url(url, hostname, path);
+
     struct sockaddr_in serv_addr;
     char buffer[BUFFER_SIZE];
     FILE *file = stdout;
@@ -112,33 +160,23 @@ void fetch_html_https(const char *hostname, int download) {
         }
     }
 
-    // OpenSSLライブラリの初期化
     SSL_library_init();
-    OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
 
-    // SSLコンテキストの作成
-    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method()); // TLS_client_methodを使用
+    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
     if (!ctx) {
-        ERR_print_errors_fp(stderr);
+        print_ssl_errors();
         return;
     }
 
-    // SSL/TLSの設定
-    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1); // 古いプロトコルを無効化
-
-    // SSL証明書の検証を無視する設定（セキュリティリスクに注意）
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
-
-    // ソケットの作成と接続
-    const int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
         perror("ERROR opening socket");
         SSL_CTX_free(ctx);
         return;
     }
 
-    const struct hostent *server = gethostbyname(hostname);
+    struct hostent *server = gethostbyname(hostname);
     if (server == NULL) {
         perror("ERROR, no such host");
         close(sockfd);
@@ -158,39 +196,52 @@ void fetch_html_https(const char *hostname, int download) {
         return;
     }
 
-    // SSLオブジェクトの作成とソケットに結び付け
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sockfd);
+
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+
     if (SSL_connect(ssl) != 1) {
-        ERR_print_errors_fp(stderr);
-        SSL_free(ssl);
-        close(sockfd);
-        SSL_CTX_free(ctx);
-        return;
+        print_ssl_errors();
+        if (verify_certificate()) {
+            SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
+            SSL_free(ssl);
+            ssl = SSL_new(ctx);
+            SSL_set_fd(ssl, sockfd);
+            if (SSL_connect(ssl) != 1) {
+                print_ssl_errors();
+                SSL_free(ssl);
+                close(sockfd);
+                SSL_CTX_free(ctx);
+                return;
+            }
+        } else {
+            SSL_free(ssl);
+            close(sockfd);
+            SSL_CTX_free(ctx);
+            return;
+        }
     }
 
-    // HTTPSリクエストの送信
-    sprintf(buffer, "GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", hostname);
+    sprintf(buffer, "GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path, hostname);
     int n = SSL_write(ssl, buffer, strlen(buffer));
     if (n < 0) {
-        ERR_print_errors_fp(stderr);
+        print_ssl_errors();
         SSL_free(ssl);
         close(sockfd);
         SSL_CTX_free(ctx);
         return;
     }
 
-    // HTTPSレスポンスの受信と処理
     while ((n = SSL_read(ssl, buffer, BUFFER_SIZE - 1)) > 0) {
         buffer[n] = '\0';
         fwrite(buffer, 1, n, file);
     }
 
     if (n < 0) {
-        ERR_print_errors_fp(stderr);
+        print_ssl_errors();
     }
 
-    // SSL接続の終了
     SSL_shutdown(ssl);
     SSL_free(ssl);
     close(sockfd);
