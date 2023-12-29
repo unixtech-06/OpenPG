@@ -33,17 +33,33 @@
 #include <string.h>
 
 #include "../include/http_request.h"
+#include "../include/http_request_https.h"
 
-int
-main(const int argc, char *argv[])
-{
+int main(const int argc, char *argv[]) {
         if (argc != 2 && (argc != 3 || strcmp(argv[1], "-d") != 0)) {
-                fprintf(stderr, "Usage: %s [-d] hostname\n", argv[0]);
+                fprintf(stderr, "Usage: %s [-d] [http:// or https://]hostname\n", argv[0]);
                 exit(1);
         }
 
         const int download = (argc == 3 && strcmp(argv[1], "-d") == 0);
-        fetch_html(argv[argc - 1], download);
+        const char *url = argv[argc - 1];
+
+        // URLスキーム（http:// または https://）を確認
+        if (strncmp(url, "https://", 8) == 0) {
+                // HTTPS処理
+                fetch_html_https(url + 8, download); // "https://" を除いた部分を渡す
+        } else if (strncmp(url, "http://", 7) == 0) {
+                // HTTP処理
+                fetch_html(url + 7, download); // "http://" を除いた部分を渡す
+        } else {
+                // スキームが指定されていない場合、HTTPSを試みる
+                if (can_connect_https(url)) {
+                        fetch_html_https(url, download);
+                } else {
+                        // HTTPSが無理な場合はHTTPを使用
+                        fetch_html(url, download);
+                }
+        }
 
         exit(0);
 }
