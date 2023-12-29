@@ -1,5 +1,5 @@
 /* BSD 3-Clause License
- * Copyright (c) 2023, Ryosuke
+* Copyright (c) 2023, Ryosuke
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,7 @@
 extern "C" {
 #endif
 
-void fetch_html(const char *hostname, int download);
+        void fetch_html(const char *hostname, int download);
 
 #ifdef __cplusplus
 }

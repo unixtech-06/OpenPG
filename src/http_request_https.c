@@ -34,7 +34,6 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +46,7 @@
 
 // HTTPS接続が可能かどうかを確認する関数
 	int
-can_connect_https(const char *hostname)
+can_connect_https(const char* hostname)
 {
 	struct sockaddr_in serv_addr;
 	int result = 0; // 接続が不可能と仮定
@@ -78,7 +77,7 @@ can_connect_https(const char *hostname)
 	memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
 	serv_addr.sin_port = htons(HTTPS_PORT);
 
-	if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+	if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		close(sockfd);
 		SSL_CTX_free(ctx);
 		return 0;
@@ -98,9 +97,8 @@ can_connect_https(const char *hostname)
 	return result;
 }
 
-// HTTPSを使用してHTMLコンテンツを取得する関数
-void 
-print_ssl_errors(void) 
+	void 
+print_ssl_errors() 
 {
 	unsigned long err;
 	while ((err = ERR_get_error()) != 0) {
@@ -113,18 +111,18 @@ print_ssl_errors(void)
 	}
 }
 
-int 
-verify_certificate(void) 
+	int 
+user_confirm(const char *message) 
 {
 	char response[2];
-	printf("SSL/TLS handshake failed. Ignore certificate verification? (y/N): ");
+	printf("%s (y/N): ", message);
 	if (scanf("%1s", response) == 1) {
 		return (response[0] == 'y' || response[0] == 'Y');
 	}
 	return 0;
 }
 
-void 
+	void 
 parse_url(const char *url, char *hostname, char *path) 
 {
 	char *url_copy = strdup(url);
@@ -149,7 +147,7 @@ parse_url(const char *url, char *hostname, char *path)
 	free(url_copy);
 }
 
-void 
+	void 
 fetch_html_https(const char *url, int download) 
 {
 	char hostname[256] = {0};
@@ -177,14 +175,14 @@ fetch_html_https(const char *url, int download)
 		return;
 	}
 
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	const int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0) {
 		perror("ERROR opening socket");
 		SSL_CTX_free(ctx);
 		return;
 	}
 
-	struct hostent *server = gethostbyname(hostname);
+	const struct hostent *server = gethostbyname(hostname);
 	if (server == NULL) {
 		perror("ERROR, no such host");
 		close(sockfd);
@@ -211,7 +209,7 @@ fetch_html_https(const char *url, int download)
 
 	if (SSL_connect(ssl) != 1) {
 		print_ssl_errors();
-		if (verify_certificate()) {
+		if (user_confirm("SSL/TLS handshake failed. Ignore certificate verification?")) {
 			SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
 			SSL_free(ssl);
 			ssl = SSL_new(ctx);
@@ -241,9 +239,18 @@ fetch_html_https(const char *url, int download)
 		return;
 	}
 
+	int header_ended = 0;
 	while ((n = SSL_read(ssl, buffer, BUFFER_SIZE - 1)) > 0) {
 		buffer[n] = '\0';
-		fwrite(buffer, 1, n, file);
+		if (!header_ended) {
+			const char *header_end = strstr(buffer, "\r\n\r\n");
+			if (header_end) {
+				header_ended = 1;
+				fwrite(header_end + 4, 1, n - (header_end - buffer) - 4, file);
+			}
+		} else {
+			fwrite(buffer, 1, n, file);
+		}
 	}
 
 	if (n < 0) {

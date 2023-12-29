@@ -1,6 +1,6 @@
 # OpenPageGetter
 
-`OpenPageGetter` は、指定されたウェブページのHTMLコンテンツを取得し、標準出力に表示するC言語プログラムです。libcurlに依存することなく使うことができます。
+`OpenPageGetter` は、指定されたウェブページのHTMLコンテンツを取得し、標準出力に表示するC言語プログラムです。このプログラムには外部の依存関係がなく、Windows以外の環境（例えばLinuxやmacOS）でも、libcurlなどのライブラリをインストールすることなく動作します。
 
 ## 機能
 

@@ -35,8 +35,8 @@
 #include "../include/http_request.h"
 #include "../include/http_request_https.h"
 
-int 
-main(const int argc, char *argv[]) 
+	int
+main(const int argc, char *argv[])
 {
 	if (argc != 2 && (argc != 3 || strcmp(argv[1], "-d") != 0)) {
 		fprintf(stderr, "Usage: %s [-d] [http:// or https://]hostname\n", argv[0]);
