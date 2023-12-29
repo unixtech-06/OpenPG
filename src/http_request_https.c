@@ -113,7 +113,9 @@ print_ssl_errors(void)
 	}
 }
 
-int verify_certificate(void) {
+int 
+verify_certificate(void) 
+{
 	char response[2];
 	printf("SSL/TLS handshake failed. Ignore certificate verification? (y/N): ");
 	if (scanf("%1s", response) == 1) {
