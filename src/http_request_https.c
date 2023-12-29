@@ -99,7 +99,9 @@ can_connect_https(const char *hostname)
 }
 
 // HTTPSを使用してHTMLコンテンツを取得する関数
-void print_ssl_errors() {
+void 
+print_ssl_errors(void) 
+{
 	unsigned long err;
 	while ((err = ERR_get_error()) != 0) {
 		char *str = ERR_error_string(err, 0);
@@ -111,7 +113,7 @@ void print_ssl_errors() {
 	}
 }
 
-int verify_certificate() {
+int verify_certificate(void) {
 	char response[2];
 	printf("SSL/TLS handshake failed. Ignore certificate verification? (y/N): ");
 	if (scanf("%1s", response) == 1) {
@@ -120,7 +122,9 @@ int verify_certificate() {
 	return 0;
 }
 
-void parse_url(const char *url, char *hostname, char *path) {
+void 
+parse_url(const char *url, char *hostname, char *path) 
+{
 	char *url_copy = strdup(url);
 	char *scheme_end = strstr(url_copy, "://");
 
@@ -143,7 +147,9 @@ void parse_url(const char *url, char *hostname, char *path) {
 	free(url_copy);
 }
 
-void fetch_html_https(const char *url, int download) {
+void 
+fetch_html_https(const char *url, int download) 
+{
 	char hostname[256] = {0};
 	char path[256] = {0};
 	parse_url(url, hostname, path);
