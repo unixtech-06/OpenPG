@@ -35,7 +35,7 @@
 extern "C" {
 #endif
 
-        void fetch_html(const char *hostname, int download);
+void fetch_html(const char *hostname, int download);
 
 #ifdef __cplusplus
 }
