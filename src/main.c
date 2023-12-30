@@ -38,28 +38,51 @@
 	int
 main(const int argc, char *argv[])
 {
-	if (argc != 2 && (argc != 3 || strcmp(argv[1], "-d") != 0)) {
-		fprintf(stderr, "Usage: %s [-d] [http:// or https://]hostname\n", argv[0]);
+	int download_html = 0;
+	int download_css = 0;
+	const char *url = NULL;
+
+	// コマンドライン引数の解析
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-d") == 0) {
+			download_html = 1;
+		} else if (strcmp(argv[i], "-c") == 0) {
+			download_css = 1;
+		} else {
+			url = argv[i];
+		}
+	}
+
+	if (!url) {
+		fprintf(stderr, "Usage: %s [-d] [-c] [http:// or https://]hostname\n", argv[0]);
 		exit(1);
 	}
 
-	const int download = (argc == 3 && strcmp(argv[1], "-d") == 0);
-	const char *url = argv[argc - 1];
-
 	// URLスキーム（http:// または https://）を確認
 	if (strncmp(url, "https://", 8) == 0) {
-		// HTTPS処理
-		fetch_html_https(url + 8, download); // "https://" を除いた部分を渡す
+		fetch_html_https(url + 8, download_html); // "https://" を除いた部分を渡す
+		if (download_css) {
+			// CSSのダウンロード
+			fetch_css_https(url + 8, download_css);
+		}
 	} else if (strncmp(url, "http://", 7) == 0) {
-		// HTTP処理
-		fetch_html(url + 7, download); // "http://" を除いた部分を渡す
+		fetch_html(url + 7, download_html); // "http://" を除いた部分を渡す
+		if (download_css) {
+			// CSSのダウンロード（HTTP版の関数が必要）
+			// fetch_css(url + 7, download_css);
+		}
 	} else {
-		// スキームが指定されていない場合、HTTPSを試みる
+		// スキームが指定されていない場合
 		if (can_connect_https(url)) {
-			fetch_html_https(url, download);
+			fetch_html_https(url, download_html);
+			if (download_css) {
+				fetch_css_https(url, download_css);
+			}
 		} else {
-			// HTTPSが無理な場合はHTTPを使用
-			fetch_html(url, download);
+			fetch_html(url, download_html);
+			if (download_css) {
+				// fetch_css(url, download_css); // HTTP版の関数が必要
+			}
 		}
 	}
 
