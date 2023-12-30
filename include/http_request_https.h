@@ -22,6 +22,13 @@ void fetch_html_https(const char *hostname, int download);
 void fetch_css_https(const char *url, int download);
 
         /**
+         * Downloads a file from the specified URL using HTTPS.
+         *
+         * @param url The URL from which to download the file.
+         */
+void download_file_https(const char *url);
+
+        /**
          * Checks if HTTPS connection can be established with the specified hostname.
          *
          * @param hostname The hostname to check for HTTPS support.

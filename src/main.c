@@ -35,56 +35,63 @@
 #include "../include/http_request.h"
 #include "../include/http_request_https.h"
 
-	int
-main(const int argc, char *argv[])
+int
+main(int argc, char* argv[])
 {
-	int download_html = 0;
-	int download_css = 0;
-	const char *url = NULL;
+        int download_html = 0;
+        int download_css = 0;
+        int download_file = 0;
+        const char* url = NULL;
 
-	// コマンドライン引数の解析
-	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-d") == 0) {
-			download_html = 1;
-		} else if (strcmp(argv[i], "-c") == 0) {
-			download_css = 1;
-		} else {
-			url = argv[i];
-		}
-	}
+        // コマンドライン引数の解析
+        for (int i = 1; i < argc; i++) {
+                if (strcmp(argv[i], "-d") == 0) {
+                        download_html = 1;
+                } else if (strcmp(argv[i], "-c") == 0) {
+                        download_css = 1;
+                } else if (strcmp(argv[i], "-dl") == 0) {
+                        download_file = 1;
+                } else {
+                        url = argv[i];
+                }
+        }
 
-	if (!url) {
-		fprintf(stderr, "Usage: %s [-d] [-c] [http:// or https://]hostname\n", argv[0]);
-		exit(1);
-	}
+        if (!url || (download_html && download_file)) {
+                fprintf(stderr, "Usage: %s [-d] [-c] [-dl] [http:// or https://]hostname\n", argv[0]);
+                exit(1);
+        }
 
-	// URLスキーム（http:// または https://）を確認
-	if (strncmp(url, "https://", 8) == 0) {
-		fetch_html_https(url + 8, download_html); // "https://" を除いた部分を渡す
-		if (download_css) {
-			// CSSのダウンロード
-			fetch_css_https(url + 8, download_css);
-		}
-	} else if (strncmp(url, "http://", 7) == 0) {
-		fetch_html(url + 7, download_html); // "http://" を除いた部分を渡す
-		if (download_css) {
-			// CSSのダウンロード（HTTP版の関数が必要）
-			// fetch_css(url + 7, download_css);
-		}
-	} else {
-		// スキームが指定されていない場合
-		if (can_connect_https(url)) {
-			fetch_html_https(url, download_html);
-			if (download_css) {
-				fetch_css_https(url, download_css);
-			}
-		} else {
-			fetch_html(url, download_html);
-			if (download_css) {
-				// fetch_css(url, download_css); // HTTP版の関数が必要
-			}
-		}
-	}
+        if (download_file) {
+                // 指定されたURLからファイルをダウンロード
+                download_file_https(url);
+        } else {
+                // URLスキーム（http:// または https://）を確認
+                if (strncmp(url, "https://", 8) == 0) {
+                        fetch_html_https(url + 8, download_html); // "https://" を除いた部分を渡す
+                        if (download_css) {
+                                fetch_css_https(url + 8, 1); // CSSのダウンロード
+                        }
+                } else if (strncmp(url, "http://", 7) == 0) {
+                        fetch_html(url + 7, download_html); // "http://" を除いた部分を渡す
+                        if (download_css) {
+                                // CSSのダウンロード（HTTP版の関数が必要）
+                                // fetch_css(url + 7, 1);
+                        }
+                } else {
+                        // スキームが指定されていない場合
+                        if (can_connect_https(url)) {
+                                fetch_html_https(url, download_html);
+                                if (download_css) {
+                                        fetch_css_https(url, 1);
+                                }
+                        } else {
+                                fetch_html(url, download_html);
+                                if (download_css) {
+                                        // fetch_css(url, 1); // HTTP版の関数が必要
+                                }
+                        }
+                }
+        }
 
-	exit(0);
+        return 0;
 }
