@@ -45,7 +45,7 @@
 #define BUFFER_SIZE 1024
 
 // SSLエラーを表示する関数
-	void 
+static void
 print_ssl_errors() 
 {
 	unsigned long err;
@@ -60,7 +60,7 @@ print_ssl_errors()
 }
 
 // ユーザーに確認を求める関数
-	int 
+int
 user_confirm(const char *message) 
 {
 	char response[2];
@@ -72,7 +72,9 @@ user_confirm(const char *message)
 }
 
 // URLからホスト名とパスを解析する関数
-void parse_url(const char *url, char *hostname, char *path) {
+static void
+parse_url(const char *url, char *hostname, char *path)
+{
 	char *url_copy = strdup(url);
 	char *scheme_end = strstr(url_copy, "://");
 
@@ -96,7 +98,7 @@ void parse_url(const char *url, char *hostname, char *path) {
 }
 
 // HTTPS接続を確立する関数
-	SSL *
+inline static SSL *
 establish_https_connection(const char *hostname, int *sockfd, SSL_CTX **ctx) 
 {
 	struct sockaddr_in serv_addr;
@@ -167,7 +169,7 @@ can_connect_https(const char *hostname)
 	return 1;
 }
 
-	void 
+static void
 extract_filename_from_url(const char *url, char *filename) 
 {
 	const char *last_slash = strrchr(url, '/');
