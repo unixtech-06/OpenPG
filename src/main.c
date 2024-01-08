@@ -38,6 +38,13 @@
 int
 main(int argc, char* argv[])
 {
+#ifdef __OpenBSD__
+        // OpenBSD環境でのみpledgeを使用してセキュリティポリシーを設定
+        if (pledge("stdio inet dns", NULL) == -1) {
+                perror("pledge");
+                exit(EXIT_FAILURE);
+        }
+#endif
         int download_html = 0;
         int download_css = 0;
         int download_file = 0;
