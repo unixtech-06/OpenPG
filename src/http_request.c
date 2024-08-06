@@ -45,13 +45,18 @@
 #define PORT 80
 #define BUFFER_SIZE 1024
 
-	void
+void
 fetch_html(const char *hostname, int download)
 {
 	struct sockaddr_in serv_addr;
+	struct hostent *server;
+	int sockfd;
 	char buffer[BUFFER_SIZE];
+	char response[BUFFER_SIZE];
+	char *header_end;
 	int header_found = 0;
 	FILE *file = stdout;
+	int n, i;
 
 	if (download) {
 		file = fopen("index.html", "wb");
@@ -59,12 +64,10 @@ fetch_html(const char *hostname, int download)
 			err(1, "ERROR opening file");
 	}
 
-	const int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0)
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 		err(1, "ERROR opening socket");
 
-	const struct hostent* server = gethostbyname(hostname);
-	if (server == NULL)
+	if ((server = gethostbyname(hostname)) == NULL)
 		errx(1, "ERROR, no such host");
 
 	memset(&serv_addr, 0, sizeof(serv_addr));
@@ -76,21 +79,19 @@ fetch_html(const char *hostname, int download)
 		err(1, "ERROR connecting");
 
 	sprintf(buffer, "GET / HTTP/1.1\r\nHost: %s\r\n\r\n", hostname);
-	int n = write(sockfd, buffer, strlen(buffer));
-	if (n < 0)
+	if ((n = write(sockfd, buffer, strlen(buffer))) < 0)
 		err(1, "ERROR writing to socket");
 
-	char response[BUFFER_SIZE];
 	while ((n = read(sockfd, response, BUFFER_SIZE - 1)) > 0) {
 		response[n] = '\0';
 
 		// 応答を小文字に変換
-		for (int i = 0; i < n; i++) {
+		for (i = 0; i < n; i++) {
 			response[i] = tolower(response[i]);
 		}
 
 		if (!header_found) {
-			const char *header_end = strstr(response, "\r\n\r\n");
+			header_end = strstr(response, "\r\n\r\n");
 			if (header_end) {
 				header_found = 1;
 				fwrite(header_end + 4, 1, strlen(header_end) - 4, file);

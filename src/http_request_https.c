@@ -41,17 +41,20 @@
 
 #include "../include/http_request_https.h"
 
-#define HTTPS_PORT 443
-#define BUFFER_SIZE 1024
+#define HTTPS_PORT	443
+#define BUFFER_SIZE	1024
 
-// SSLエラーを表示する関数
+/*
+ * SSLエラーを表示する関数
+ */
 static void
-print_ssl_errors() 
+print_ssl_errors(void)
 {
-	unsigned long err;
+	unsigned long	err;
+	char		*str;
+
 	while ((err = ERR_get_error()) != 0) {
-		char *str = ERR_error_string(err, 0);
-		if (str) {
+		if ((str = ERR_error_string(err, 0)) != NULL) {
 			fprintf(stderr, "SSL error: %s\n", str);
 		} else {
 			fprintf(stderr, "SSL error: %lu (no string representation)\n", err);
@@ -59,57 +62,68 @@ print_ssl_errors()
 	}
 }
 
-// ユーザーに確認を求める関数
+/*
+ * ユーザーに確認を求める関数
+ */
 int
-user_confirm(const char *message) 
+user_confirm(const char *message)
 {
-	char response[2];
+	char	response[2];
+
 	printf("%s (y/N): ", message);
-	if (scanf("%1s", response) == 1) {
+	if (scanf("%1s", response) == 1)
 		return (response[0] == 'y' || response[0] == 'Y');
-	}
 	return 0;
 }
 
-// URLからホスト名とパスを解析する関数
+/*
+ * URLからホスト名とパスを解析する関数
+ */
 static void
 parse_url(const char *url, char *hostname, char *path)
 {
-	char *url_copy = strdup(url);
-	char *scheme_end = strstr(url_copy, "://");
+	char	*url_copy, *scheme_end, *path_start;
+
+	url_copy = strdup(url);
+	scheme_end = strstr(url_copy, "://");
+	path_start = NULL;
 
 	if (scheme_end) {
-		*scheme_end = '\0';  // スキームの終わりをマーク
-		scheme_end += 3;     // "://" をスキップ
+		*scheme_end = '\0';	/* スキームの終わりをマーク */
+		scheme_end += 3;	/* "://" をスキップ */
 	} else {
-		scheme_end = url_copy;  // スキームがない場合
+		scheme_end = url_copy;	/* スキームがない場合 */
 	}
 
-	char *path_start = strstr(scheme_end, "/");
+	path_start = strstr(scheme_end, "/");
 	if (path_start) {
-		*path_start = '\0';  // ホスト名の終わりをマーク
-		strcpy(hostname, scheme_end);
-		strcpy(path, path_start + 1);
+		*path_start = '\0';	/* ホスト名の終わりをマーク */
+		strlcpy(hostname, scheme_end, sizeof(hostname));
+		strlcpy(path, path_start + 1, sizeof(path));
 	} else {
-		strcpy(hostname, scheme_end);
-		strcpy(path, "");  // パスがない場合
+		strlcpy(hostname, scheme_end, sizeof(hostname));
+		strlcpy(path, "", sizeof(path));	/* パスがない場合 */
 	}
 	free(url_copy);
 }
 
-// HTTPS接続を確立する関数
-inline static SSL *
-establish_https_connection(const char *hostname, int *sockfd, SSL_CTX **ctx) 
+/*
+ * HTTPS接続を確立する関数
+ */
+static SSL *
+establish_https_connection(const char *hostname, int *sockfd, SSL_CTX **ctx)
 {
-	struct sockaddr_in serv_addr;
+	struct sockaddr_in	serv_addr;
+	struct hostent		*server;
+	SSL			*ssl;
+
 	*sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (*sockfd < 0) {
 		perror("ERROR opening socket");
 		return NULL;
 	}
 
-	const struct hostent *server = gethostbyname(hostname);
-	if (server == NULL) {
+	if ((server = gethostbyname(hostname)) == NULL) {
 		perror("ERROR, no such host");
 		close(*sockfd);
 		return NULL;
@@ -133,7 +147,7 @@ establish_https_connection(const char *hostname, int *sockfd, SSL_CTX **ctx)
 		return NULL;
 	}
 
-	SSL *ssl = SSL_new(*ctx);
+	ssl = SSL_new(*ctx);
 	SSL_set_fd(ssl, *sockfd);
 
 	if (SSL_connect(ssl) != 1) {
@@ -147,21 +161,25 @@ establish_https_connection(const char *hostname, int *sockfd, SSL_CTX **ctx)
 	return ssl;
 }
 
-// HTTPS接続が可能かどうかを確認する関数
-	int
+/*
+ * HTTPS接続が可能かどうかを確認する関数
+ */
+int
 can_connect_https(const char *hostname)
 {
-	int sockfd;
-	SSL_CTX *ctx;
-	SSL *ssl = establish_https_connection(hostname, &sockfd, &ctx);
+	int	sockfd;
+	SSL_CTX	*ctx;
+	SSL	*ssl;
+
+	ssl = establish_https_connection(hostname, &sockfd, &ctx);
 	if (!ssl) {
-		// 接続に失敗した場合
-		if (sockfd >= 0) close(sockfd);
-		if (ctx) SSL_CTX_free(ctx);
+		if (sockfd >= 0)
+			close(sockfd);
+		if (ctx)
+			SSL_CTX_free(ctx);
 		return 0;
 	}
 
-	// 接続に成功した場合
 	SSL_shutdown(ssl);
 	SSL_free(ssl);
 	close(sockfd);
@@ -170,34 +188,40 @@ can_connect_https(const char *hostname)
 }
 
 static void
-extract_filename_from_url(const char *url, char *filename) 
+extract_filename_from_url(const char *url, char *filename)
 {
-	const char *last_slash = strrchr(url, '/');
+	const char	*last_slash;
+
+	last_slash = strrchr(url, '/');
 	if (last_slash && *(last_slash + 1)) {
-		strcpy(filename, last_slash + 1);
+		strlcpy(filename, last_slash + 1, sizeof(filename));
 	} else {
-		// URLにファイル名が含まれていない場合、デフォルトのファイル名を使用
-		strcpy(filename, "downloaded_file");
+		strlcpy(filename, "downloaded_file", sizeof(filename));
 	}
 }
 
-// HTTPSを介してHTMLを取得する関数
-	void 
-fetch_html_https(const char *url, int download) 
+/*
+ * HTTPSを介してHTMLを取得する関数
+ */
+void
+fetch_html_https(const char *url, int download)
 {
-	char hostname[256] = {0};
-	char path[256] = {0};
+	char	hostname[256] = {0};
+	char	path[256] = {0};
+	int	sockfd, n;
+	SSL_CTX	*ctx;
+	SSL	*ssl;
+	char	buffer[BUFFER_SIZE];
+	FILE	*file;
+
 	parse_url(url, hostname, path);
 
-	int sockfd;
-	SSL_CTX *ctx;
-	SSL *ssl = establish_https_connection(hostname, &sockfd, &ctx);
+	ssl = establish_https_connection(hostname, &sockfd, &ctx);
 	if (!ssl) {
 		return;
 	}
 
-	char buffer[BUFFER_SIZE];
-	FILE *file = stdout;
+	file = stdout;
 	if (download) {
 		file = fopen("index.html", "wb");
 		if (file == NULL) {
@@ -209,8 +233,10 @@ fetch_html_https(const char *url, int download)
 		}
 	}
 
-	sprintf(buffer, "GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path, hostname);
-	int n = SSL_write(ssl, buffer, strlen(buffer));
+	snprintf(buffer, sizeof(buffer),
+	    "GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
+	    path, hostname);
+	n = SSL_write(ssl, buffer, strlen(buffer));
 	if (n < 0) {
 		print_ssl_errors();
 		SSL_free(ssl);
@@ -250,23 +276,28 @@ fetch_html_https(const char *url, int download)
 	}
 }
 
-// HTTPSを介してCSSを取得する関数
-	void 
-fetch_css_https(const char *url, int download) 
+/*
+ * HTTPSを介してCSSを取得する関数
+ */
+void
+fetch_css_https(const char *url, int download)
 {
-	char hostname[256] = {0};
-	char path[256] = {0};
+	char	hostname[256] = {0};
+	char	path[256] = {0};
+	int	sockfd, n;
+	SSL_CTX	*ctx;
+	SSL	*ssl;
+	char	buffer[BUFFER_SIZE];
+	FILE	*file;
+
 	parse_url(url, hostname, path);
 
-	int sockfd;
-	SSL_CTX *ctx;
-	SSL *ssl = establish_https_connection(hostname, &sockfd, &ctx);
+	ssl = establish_https_connection(hostname, &sockfd, &ctx);
 	if (!ssl) {
 		return;
 	}
 
-	char buffer[BUFFER_SIZE];
-	FILE *file = stdout;
+	file = stdout;
 	if (download) {
 		char css_filename[256] = {0};
 		extract_filename_from_url(path, css_filename);
@@ -280,8 +311,10 @@ fetch_css_https(const char *url, int download)
 		}
 	}
 
-	sprintf(buffer, "GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path, hostname);
-	int n = SSL_write(ssl, buffer, strlen(buffer));
+	snprintf(buffer, sizeof(buffer),
+	    "GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
+	    path, hostname);
+	n = SSL_write(ssl, buffer, strlen(buffer));
 	if (n < 0) {
 		print_ssl_errors();
 		SSL_free(ssl);
@@ -312,26 +345,30 @@ fetch_css_https(const char *url, int download)
 	}
 }
 
-// HTTPSを介してファイルをダウンロードする関数
-	void 
-download_file_https(const char *url) 
+/*
+ * HTTPSを介してファイルをダウンロードする関数
+ */
+void
+download_file_https(const char *url)
 {
-	char hostname[256] = {0};
-	char path[256] = {0};
-	char filename[256] = {0};
+	char	hostname[256] = {0};
+	char	path[256] = {0};
+	char	filename[256] = {0};
+	int	sockfd, n;
+	SSL_CTX	*ctx;
+	SSL	*ssl;
+	char	buffer[BUFFER_SIZE];
+	FILE	*file;
 
 	parse_url(url, hostname, path);
 	extract_filename_from_url(path, filename);
 
-	int sockfd;
-	SSL_CTX *ctx;
-	SSL *ssl = establish_https_connection(hostname, &sockfd, &ctx);
+	ssl = establish_https_connection(hostname, &sockfd, &ctx);
 	if (!ssl) {
 		return;
 	}
 
-	char buffer[BUFFER_SIZE];
-	FILE *file = fopen(filename, "wb");
+	file = fopen(filename, "wb");
 	if (!file) {
 		perror("ERROR opening file");
 		SSL_free(ssl);
@@ -340,8 +377,10 @@ download_file_https(const char *url)
 		return;
 	}
 
-	sprintf(buffer, "GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path, hostname);
-	int n = SSL_write(ssl, buffer, strlen(buffer));
+	snprintf(buffer, sizeof(buffer),
+	    "GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
+	    path, hostname);
+	n = SSL_write(ssl, buffer, strlen(buffer));
 	if (n < 0) {
 		print_ssl_errors();
 		SSL_free(ssl);
